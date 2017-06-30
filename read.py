@@ -145,6 +145,24 @@ if __name__ == '__main__':
         for (molecule_smiles, molecules) in molecules_grouped_by_names
     })
 
-    for (molecule_smiles, atb_molids) in atb_matches.items():
-        if len(atb_molids) == 0:
-            print(molecule_smiles, best_structures[molecule_smiles])
+    try:
+        from atb_helpers.babel import babel_output
+        for (molecule_smiles, atb_molids) in atb_matches.items():
+            if len(atb_molids) == 0:
+                print(molecule_smiles, best_structures[molecule_smiles])
+                print(
+                    api.Molecules.submit(
+                        public=True,
+                        netcharge=0,
+                        pdb=babel_output(
+                            best_structures[molecule_smiles],
+                            in_format='sdf',
+                            out_format='pdb',
+                        ),
+                        moltype='heteromolecule',
+                    )
+                )
+            else:
+                print('Not submiting')
+    except ImportError:
+        pass
