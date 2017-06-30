@@ -15,12 +15,11 @@ DATA_FILE_NAME = 'QM_MM_Gas_Phase_Torsion_Scan_Individual_Results_with_CCSD_T_CB
 
 assert exists(DATA_FILE_NAME), '''ERROR:Can't find {0} in current directory'''.format(DATA_FILE_NAME)
 
-def try_float(x: str) -> float:
+def try_float(x: str) -> Union[float, str]:
     try:
-        print(float(x))
         return float(x)
     except ValueError:
-        return float('nan')
+        return x
 
 def molecule_name_and_dict_for(molecule_lines: List[str]) -> Dict[str, Any]:
     molecule_dict = {'atom_lines': [], 'bond_lines': []}
@@ -34,7 +33,7 @@ def molecule_name_and_dict_for(molecule_lines: List[str]) -> Dict[str, Any]:
             molecule_dict['software'] = line
         else:
             if line.startswith('>'):
-                molecule_dict[line.split()[-1].replace('<', '').replace('>', '')] = molecule_lines[i + 1].strip()
+                molecule_dict[line.split()[-1].replace('<', '').replace('>', '')] = try_float(molecule_lines[i + 1].strip())
             elif len(line) in [70, 40]:
                 molecule_dict['atom_lines'].append(line)
             elif len(line) == 22:
@@ -128,11 +127,24 @@ if __name__ == '__main__':
         for row in sorted(molecules_grouped_by_names_with_angles, key=itemgetter(1), reverse=True):
             csv_writer.writerow(row)
 
-    print({
+    best_structures = {
+        molecule_smiles: sdf_for_molecule(sorted(molecules, key=lambda m: m['deltaE'])[0])
+        for (molecule_smiles, molecules) in molecules_grouped_by_names
+    }
+
+    atb_matches = ({
         molecule_smiles: [
             match['molid']
             for match in
-            api.Molecules.structure_search(structure_format='sdf', structure=sdf_for_molecule(molecules[0]), netcharge='*')['matches']
+            api.Molecules.structure_search(
+                structure_format='sdf',
+                structure=sdf_for_molecule(molecules[0]),
+                netcharge='*',
+            )['matches']
         ]
         for (molecule_smiles, molecules) in molecules_grouped_by_names
     })
+
+    for (molecule_smiles, atb_molids) in atb_matches.items():
+        if len(atb_molids) == 0:
+            print(molecule_smiles, best_structures[molecule_smiles])
